@@ -1,3 +1,4 @@
+#include "config.h"
 #include "sympp.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -12,23 +13,21 @@
 using namespace std;
 
 struct regs{
-	uint32_t EAX;
-	uint32_t ECX;
-	uint32_t EDX;
-	uint32_t EBX;
-	uint32_t ESP;
-	uint32_t EBP;
-	uint32_t ESI;
-	uint32_t EDI;
-	uint32_t EIP;
+	target_ulong EAX;
+	target_ulong ECX;
+	target_ulong EDX;
+	target_ulong EBX;
+	target_ulong ESP;
+	target_ulong EBP;
+	target_ulong ESI;
+	target_ulong EDI;
+	target_ulong EIP;
 };
 
 typedef uint8_t stack[8192];
 
-#define TASK_SIZE 0xc0000000UL
-
 void print_trace(const stack& stk, const regs& reg, const ksyms& sym, ostream& os){
-	uint32_t ebp = reg.EBP, base = reg.ESP & -sizeof(stack), raddr = reg.EIP;
+	target_ulong ebp = reg.EBP, base = reg.ESP & -sizeof(stack), raddr = reg.EIP;
 	if(base < TASK_SIZE){
 		return;
 	}
@@ -37,12 +36,12 @@ void print_trace(const stack& stk, const regs& reg, const ksyms& sym, ostream& o
 		--isym;
 		os << boost::format("  %08x %s+%x") %
 				raddr % isym->second.c_str() % (raddr - isym->first) << endl;
-		if(ebp <= base || ebp > base + sizeof(stack) - sizeof(uint32_t) * 2){
+		if(ebp <= base || ebp > base + sizeof(stack) - sizeof(target_ulong) * 2){
 			break;
 		}
 		auto prevbp = ebp - base + stk;
-		ebp = *(uint32_t*)prevbp;
-		raddr = *(uint32_t*)(prevbp + sizeof(uint32_t));
+		ebp = *(target_ulong*)prevbp;
+		raddr = *(target_ulong*)(prevbp + sizeof(target_ulong));
 	}
 }
 
