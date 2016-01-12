@@ -37,7 +37,14 @@ krsyms load_revsyms(const char* _sysmap){
 calltrace convert_addr(const list<target_ulong>& trace, const ksyms& sym) {
 	calltrace ret;
 	for (auto& raddr : trace) {
+		if(!raddr){
+			continue;
+		}
 		auto isym = sym.upper_bound(raddr);
+		if(isym == sym.begin()){
+			cerr << boost::format("address " TARGET_ULONG_FMT " not found!!") % raddr << endl;
+			continue;
+		}
 		--isym;
 		ret.push_back(make_pair(isym->second, raddr - isym->first));
 	}

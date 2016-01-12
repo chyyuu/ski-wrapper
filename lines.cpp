@@ -18,10 +18,16 @@ using namespace std;
 
 #define ADDR2LINE_FORMAT "addr2line -e \"%s\" 0x" TARGET_ULONG_FMT
 
-typedef list<pair<string, unsigned long>> srclines;
+typedef list<pair<string, pair<string, unsigned long>>> srclines;
 
-srclines addr2line(const char* exe, const char* prefix, target_ulong addr){
+srclines addr2line(const char* exe, const char* prefix, const krsyms& sym, const callsite& cs){
     srclines ret;
+    krsyms::const_iterator i;
+    if((i = sym.find(cs.first)) == sym.end()){
+        cerr << "[" << cs.first << "] not found" << endl;
+        return ret;
+    }
+    auto addr = i->second + cs.second;
     int buf_num = snprintf(NULL, 0, ADDR2LINE_FORMAT, exe, addr);
     char cmdline[buf_num + 1];
     sprintf(cmdline, ADDR2LINE_FORMAT, exe, addr);
@@ -37,7 +43,7 @@ srclines addr2line(const char* exe, const char* prefix, target_ulong addr){
             assert(!strncmp(filename.c_str(), prefix, strlen(prefix)));
             filename.erase(0, strlen(prefix));
         }
-        ret.push_back(make_pair(move(filename), number));
+        ret.push_back(make_pair(move(cs.first), make_pair(move(filename), number)));
     }
     return ret;
 }
@@ -57,14 +63,11 @@ int main(int, char** argv){
         char filename[max_len + 1];
         sprintf(filename, "%0*zu", max_len, i++);
         for(auto& c : t){
-            if(sym.find(c.first) == sym.end()){
-                cerr << "[" << c.first << "] not found" << endl;
-            }
-            lines.splice(lines.end(), addr2line(argv[3], argv[4], sym[c.first] + c.second));
+            lines.splice(lines.end(), addr2line(argv[3], argv[4], sym, c));
         }
         ofstream of(filename);
         for(auto& l : lines){
-            of << l.first << ":" << l.second << endl;
+            of << l.first << " ( " << l.second.first << ":" << l.second.second << ")" << endl;
         }
     }
     return 0;

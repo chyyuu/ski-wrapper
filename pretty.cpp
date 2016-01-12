@@ -1,7 +1,6 @@
 #include "config.h"
 #include "sympp.h"
 #include "ski-race.h"
-#include "converter.h"
 
 #include <memory>
 #include <fstream>
@@ -14,18 +13,36 @@
 
 using namespace std;
 
+void race2trace(const list<ski_rd_race>& races, const ksyms& sym, set<calltrace>& read, set<calltrace>& write){
+	for(auto& race : races){
+		if(race.m1.is_read){
+			read.insert(convert_addr(race.m1.trace, sym));
+		}else{
+			write.insert(convert_addr(race.m1.trace, sym));
+		}
+		if(race.m2.is_read){
+			read.insert(convert_addr(race.m2.trace, sym));
+		}else{
+			write.insert(convert_addr(race.m2.trace, sym));
+		}
+	}
+}
+
 void print_trace_sym(const ksyms& sym_map, const ski_rd_memory_access& acc, ostream& os){
 	static const char* rw_type[] = {"write", "read"};
 	os << boost::format("%s %08x len = %d") % rw_type[!!acc.is_read] % acc.physical_memory_address %
 			acc.length << endl;
 	for(auto& raddr : acc.trace){
+		if(!raddr){
+			continue;
+		}
 		auto isym = sym_map.upper_bound(raddr);
+		assert(isym != sym_map.begin());
 		--isym;
 		os << boost::format("%08x %s+%x") % raddr % isym->second.c_str() % (raddr - isym->first) << endl;
 	}
 	os << endl;
 }
-
 
 void print_race_sym(const ksyms& sym, const list<ski_rd_race>& races, ostream& os){
 	//const char* type[] = {"write", "read"};
@@ -51,15 +68,31 @@ void print_race_sym(const ksyms& sym, const list<ski_rd_race>& races, ostream& o
 	}
 }
 
+void print_traces(const set<calltrace>& traces, ostream& os){
+	size_t id = 0;
+	for(auto& t : traces){
+		os << "id " << dec << id++ << endl;
+		for(auto& e : t){
+			os << hex << e.first << "+" << e.second << endl;
+		}
+		os << "--------------------------------------------------------------------------------" << endl;
+	}
+}
+
 int main(int, char** argv){
 	auto sym = load_syms(argv[1]);
 	//print_map(sym_map, cout);
 	auto race_list = load_race(argv[2]);
 	//print_race(race_list, cout);
-	//print_race_sym(sym, race_list, cout);
+	print_race_sym(sym, race_list, cout);
 	set<calltrace> read_trace;
 	set<calltrace> write_trace;
 	race2trace(race_list, sym, read_trace, write_trace);
+
+	cout << "====reads====" << endl;
+	print_traces(read_trace, cout);
+	cout << "====writes====" << endl;
+	print_traces(write_trace, cout);
 
 	ofstream readtrace_xml(argv[3]);
 	ofstream writetrace_xml(argv[4]);
